@@ -83,7 +83,7 @@
                                         </div>
                                         <div class="col-md-6 mb-3">
                                             <a href="{{ route('admin.import-courses') }}" class="btn btn-info w-100">
-                                                <i class="bi bi-upload"></i> Import Courses
+                                                <i class="bi bi-cloud-download"></i> Sync from BRACU
                                             </a>
                                         </div>
                                     </div>

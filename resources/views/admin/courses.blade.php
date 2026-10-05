@@ -9,11 +9,8 @@
                     <h4>{{ __('Course Management') }}</h4>
                     <div>
                         <a href="{{ route('admin.import-courses') }}" class="btn btn-primary me-2">
-                            <i class="bi bi-file-earmark-spreadsheet"></i> Import Courses from CSV
+                            <i class="bi bi-cloud-download"></i> Sync from BRACU
                         </a>
-                        <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#uploadScheduleModal">
-                            <i class="bi bi-upload"></i> Upload Schedule CSV
-                        </button>
                         <a href="{{ route('admin.dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
                     </div>
                 </div>
@@ -111,44 +108,4 @@
     </div>
 </div>
 
-<!-- Upload Schedule Modal -->
-<div class="modal fade" id="uploadScheduleModal" tabindex="-1" aria-labelledby="uploadScheduleModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="uploadScheduleModalLabel">Upload Class Schedule CSV</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form action="{{ route('admin.upload-schedule') }}" method="POST" enctype="multipart/form-data">
-                @csrf
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="semester" class="form-label">Semester</label>
-                        <select class="form-control" id="semester" name="semester" required>
-                            <option value="">Select Semester</option>
-                            <option value="Spring">Spring</option>
-                            <option value="Summer">Summer</option>
-                            <option value="Fall">Fall</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="year" class="form-label">Year</label>
-                        <input type="number" class="form-control" id="year" name="year" value="{{ date('Y') }}" min="2020" max="2030" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="csv_file" class="form-label">CSV File</label>
-                        <input type="file" class="form-control" id="csv_file" name="csv_file" accept=".csv" required>
-                        <div class="form-text">
-                            CSV should contain columns: course_code, course_name, section, lecturer_name, lecturer_email, schedule, room
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-primary">Upload Schedule</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 @endsection

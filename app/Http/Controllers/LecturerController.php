@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Response;
@@ -37,8 +38,57 @@ class LecturerController extends Controller
                           ->latest()
                           ->take(10)
                           ->get();
+        $todaysClasses = $this->todaysClasses($courses);
         
-        return view('lecturer.dashboard', compact('courses', 'sessions'));
+        return view('lecturer.dashboard', compact('courses', 'sessions', 'todaysClasses'));
+    }
+
+    /**
+     * The lecturer's classes scheduled for today (BRACU timetable), in start-time order,
+     * each with the latest attendance session generated for it today.
+     *
+     * @param  \Illuminate\Support\Collection  $courses
+     * @return \Illuminate\Support\Collection
+     */
+    private function todaysClasses($courses)
+    {
+        $timezone = config('bracu.timezone');
+        $now = now($timezone);
+        $today = $now->copy()->startOfDay();
+
+        $classes = $courses->flatMap(function ($course) use ($today, $timezone) {
+            return collect($course->classesOn($today))->map(function ($slot) use ($course, $today, $timezone) {
+                return [
+                    'course' => $course,
+                    'start' => Carbon::parse($today->toDateString() . ' ' . $slot['startTime'], $timezone),
+                    'end' => Carbon::parse($today->toDateString() . ' ' . $slot['endTime'], $timezone),
+                ];
+            });
+        });
+
+        // Sessions generated since local midnight (timestamps are stored in the app timezone)
+        $sessionsToday = Session::whereIn('course_id', $classes->pluck('course.id')->unique())
+                                ->where('created_at', '>=', $today->copy()->setTimezone(config('app.timezone')))
+                                ->latest()
+                                ->get()
+                                ->groupBy('course_id');
+
+        return $classes->map(function ($class) use ($now, $sessionsToday) {
+            $session = optional($sessionsToday->get($class['course']->id))->first();
+
+            if ($now->lt($class['start']->copy()->subMinutes(15))) {
+                $class['status'] = 'upcoming';
+            } elseif ($now->lte($class['end'])) {
+                $class['status'] = 'now';
+            } else {
+                $class['status'] = 'ended';
+            }
+
+            $class['session'] = $session;
+            $class['qr_active'] = $session && $session->status === 'active' && !$session->isQrExpired();
+
+            return $class;
+        })->sortBy('start')->values();
     }
     
     /**
@@ -51,7 +101,11 @@ class LecturerController extends Controller
     {
         $request->validate([
             'course_id' => 'required|exists:courses,id',
-            'expiry_minutes' => 'required|integer|min:5|max:60',
+            'latitude' => 'required|numeric|between:-90,90',
+            'longitude' => 'required|numeric|between:-180,180',
+        ], [
+            'latitude.required' => 'Your location is required to generate a QR code. Please allow location access.',
+            'longitude.required' => 'Your location is required to generate a QR code. Please allow location access.',
         ]);
         
         $course = Course::findOrFail($request->course_id);
@@ -68,7 +122,10 @@ class LecturerController extends Controller
         $session->start_time = now()->toTimeString();
         $session->end_time = now()->addHours(1)->toTimeString(); // Default 1 hour session
         $session->qr_code = 'ATTENDANCE_' . $request->course_id . '_' . time() . '_' . bin2hex(random_bytes(8)); // Generate a more readable QR code
-        $session->qr_expiry = now()->addMinutes($request->expiry_minutes);
+        $session->qr_expiry = now()->addMinutes(config('attendance.qr_valid_minutes'));
+        $session->latitude = $request->latitude;
+        $session->longitude = $request->longitude;
+        $session->radius_meters = config('attendance.radius_meters');
         $session->status = 'active';
         $session->save();
         

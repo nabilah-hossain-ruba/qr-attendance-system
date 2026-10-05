@@ -10,7 +10,7 @@ use App\Models\Course;
 use App\Models\Session;
 use App\Models\Attendance;
 use Illuminate\Support\Facades\DB;
-use App\Services\CourseImportService;
+use App\Services\BracuScheduleSync;
 use App\Models\CourseSection;
 use App\Models\Enrollment;
 
@@ -84,12 +84,16 @@ class AdminController extends Controller
             'email' => 'required|string|email|max:255|unique:users,email,' . $id,
             'role' => 'required|in:admin,lecturer,student',
             'student_id' => 'nullable|string|max:255|unique:users,student_id,' . $id,
+            'faculty_initial' => 'nullable|alpha|max:10|unique:users,faculty_initial,' . $id,
         ]);
         
         $user->name = $request->name;
         $user->email = $request->email;
         $user->role = $request->role;
         $user->student_id = $request->student_id;
+        $user->faculty_initial = $user->role === 'lecturer' && $request->filled('faculty_initial')
+            ? strtoupper($request->faculty_initial)
+            : null;
         
         if ($request->filled('password')) {
             $request->validate([
@@ -98,12 +102,37 @@ class AdminController extends Controller
             $user->password = Hash::make($request->password);
         }
         
+        $initialChanged = $user->isDirty('faculty_initial');
         $user->save();
+
+        $message = 'User updated successfully!';
+
+        if ($initialChanged) {
+            $assigned = BracuScheduleSync::assignCoursesToLecturer($user);
+            $message .= $user->faculty_initial ? " {$assigned} course(s) assigned from the BRACU schedule." : '';
+        }
         
         return redirect()->route('admin.users')
-                        ->with('status', 'User updated successfully!');
+                        ->with('status', $message);
     }
     
+    /**
+     * Unlink the user's registered attendance device so they can use a new one.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function resetDevice($id)
+    {
+        $user = User::findOrFail($id);
+        $user->device_id = null;
+        $user->device_bound_at = null;
+        $user->save();
+
+        return redirect()->route('admin.users.edit', $user->id)
+                        ->with('status', 'Device reset. The user can now mark attendance from a new device.');
+    }
+
     /**
      * Remove the specified user.
      *
@@ -557,165 +586,32 @@ class AdminController extends Controller
     }
     
     /**
-     * Show CSV import preview page.
+     * Show the BRACU schedule sync page.
      *
-     * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
     public function showImportForm()
     {
         return view('admin.import-courses');
     }
-    
+
     /**
-     * Preview CSV file before importing.
+     * Pull course sections, schedules and lecturers from BRACU Connect now.
      *
-     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Services\BracuScheduleSync  $sync
      * @return \Illuminate\Http\Response
      */
-    public function previewCsvImport(Request $request)
+    public function syncBracuSchedule(BracuScheduleSync $sync)
     {
-        $request->validate([
-            'csv_file' => 'required|file|mimes:csv,txt|max:2048'
-        ]);
-        
-        $importService = new CourseImportService();
-        
         try {
-            $preview = $importService->previewCsvFile($request->file('csv_file'));
-            
-            return response()->json([
-                'success' => true,
-                'preview' => $preview['preview'],
-                'total_rows' => $preview['total_rows'],
-                'valid_rows' => $preview['valid_rows']
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error reading CSV file: ' . $e->getMessage()
-            ], 400);
+            $stats = $sync->sync();
+        } catch (\Throwable $e) {
+            return redirect()->route('admin.import-courses')
+                           ->with('error', 'BRACU sync failed: ' . $e->getMessage());
         }
-    }
-    
-    /**
-     * Import courses from CSV file.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
-     */
-    public function importCoursesFromCsv(Request $request)
-    {
-        $request->validate([
-            'csv_file' => 'required|file|mimes:csv,txt|max:2048'
-        ]);
-        
-        $importService = new CourseImportService();
-        
-        try {
-            $result = $importService->importFromUploadedFile($request->file('csv_file'));
-            
-            $message = "Import completed! ";
-            $message .= "Created: {$result['courses_created']}, ";
-            $message .= "Updated: {$result['courses_updated']}, ";
-            $message .= "Errors: {$result['errors']}";
-            
-            $alertType = $result['errors'] > 0 ? 'warning' : 'success';
-            
-            return redirect()->route('admin.courses')
-                           ->with($alertType, $message)
-                           ->with('import_warnings', $result['warnings'] ?? []);
-                           
-        } catch (\Exception $e) {
-            return redirect()->back()
-                           ->with('error', 'Import failed: ' . $e->getMessage());
-        }
-    }
-    
-    /**
-     * Upload class schedule CSV file.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
-     */
-    public function uploadSchedule(Request $request)
-    {
-        $request->validate([
-            'semester' => 'required|string|in:Spring,Summer,Fall',
-            'year' => 'required|integer|min:2020|max:2030',
-            'csv_file' => 'required|file|mimes:csv,txt|max:2048'
-        ]);
-        
-        $file = $request->file('csv_file');
-        $path = $file->getRealPath();
-        
-        if (($handle = fopen($path, 'r')) !== FALSE) {
-            $header = fgetcsv($handle); // Skip header row
-            $successCount = 0;
-            $errorCount = 0;
-            
-            DB::beginTransaction();
-            
-            try {
-                while (($data = fgetcsv($handle)) !== FALSE) {
-                    if (count($data) >= 7) {
-                        // Expected columns: course_code, course_name, section, lecturer_name, lecturer_email, schedule, room
-                        $courseCode = trim($data[0]);
-                        $courseName = trim($data[1]);
-                        $section = trim($data[2]);
-                        $lecturerName = trim($data[3]);
-                        $lecturerEmail = trim($data[4]);
-                        $schedule = trim($data[5]);
-                        $room = trim($data[6]);
-                        
-                        // Create or find lecturer
-                        $lecturer = User::firstOrCreate(
-                            ['email' => $lecturerEmail],
-                            [
-                                'name' => $lecturerName,
-                                'role' => 'lecturer',
-                                'password' => Hash::make('lecturer123'), // Default password
-                            ]
-                        );
-                        
-                        // Create course
-                        Course::updateOrCreate(
-                            [
-                                'course_code' => $courseCode,
-                                'section' => $section,
-                                'semester' => $request->semester,
-                                'year' => $request->year
-                            ],
-                            [
-                                'course_name' => $courseName,
-                                'lecturer_id' => $lecturer->id,
-                                'schedule' => $schedule,
-                                'room' => $room
-                            ]
-                        );
-                        
-                        $successCount++;
-                    } else {
-                        $errorCount++;
-                    }
-                }
-                
-                DB::commit();
-                fclose($handle);
-                
-                return redirect()->route('admin.courses')
-                    ->with('status', "Schedule uploaded successfully! {$successCount} courses processed, {$errorCount} errors.");
-                    
-            } catch (\Exception $e) {
-                DB::rollBack();
-                fclose($handle);
-                
-                return redirect()->route('admin.courses')
-                    ->with('error', 'Error processing CSV: ' . $e->getMessage());
-            }
-        }
-        
-        return redirect()->route('admin.courses')
-            ->with('error', 'Could not read the CSV file.');
+
+        return redirect()->route('admin.import-courses')
+                       ->with('success', "BRACU sync completed! Created: {$stats['created']}, Updated: {$stats['updated']}, "
+                           . "Assigned to a lecturer: {$stats['with_lecturer']}, Skipped: {$stats['skipped']}");
     }
 }

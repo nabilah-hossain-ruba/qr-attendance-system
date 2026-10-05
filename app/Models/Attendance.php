@@ -21,6 +21,10 @@ class Attendance extends Model
         'marked_at',
         'ip_address',
         'device_info',
+        'device_id',
+        'latitude',
+        'longitude',
+        'distance_meters',
     ];
 
     /**

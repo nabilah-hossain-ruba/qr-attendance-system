@@ -21,6 +21,9 @@ class Session extends Model
         'end_time',
         'qr_code',
         'qr_expiry',
+        'latitude',
+        'longitude',
+        'radius_meters',
         'status',
     ];
 
@@ -34,6 +37,9 @@ class Session extends Model
         'start_time' => 'datetime',
         'end_time' => 'datetime',
         'qr_expiry' => 'datetime',
+        'latitude' => 'float',
+        'longitude' => 'float',
+        'radius_meters' => 'integer',
     ];
 
     /**
@@ -63,17 +69,42 @@ class Session extends Model
     /**
      * Generate a new QR code for the session.
      */
-    public function generateQrCode($expiryMinutes = 15)
+    public function generateQrCode($expiryMinutes = null)
     {
         // Generate a unique token for the QR code
         $token = encrypt($this->id . '_' . time());
         
         // Set the QR code and expiry time
         $this->qr_code = $token;
-        $this->qr_expiry = now()->addMinutes($expiryMinutes);
+        $this->qr_expiry = now()->addMinutes($expiryMinutes ?? config('attendance.qr_valid_minutes'));
         $this->save();
         
         return $token;
+    }
+
+    /**
+     * Whether a classroom location was captured for this session.
+     */
+    public function hasLocation()
+    {
+        return $this->latitude !== null && $this->longitude !== null;
+    }
+
+    /**
+     * Distance in meters between the session's classroom location and the given point.
+     */
+    public function distanceTo($latitude, $longitude)
+    {
+        $earthRadius = 6371000;
+
+        $lat1 = deg2rad($this->latitude);
+        $lat2 = deg2rad($latitude);
+        $deltaLat = deg2rad($latitude - $this->latitude);
+        $deltaLng = deg2rad($longitude - $this->longitude);
+
+        $a = sin($deltaLat / 2) ** 2 + cos($lat1) * cos($lat2) * sin($deltaLng / 2) ** 2;
+
+        return $earthRadius * 2 * atan2(sqrt($a), sqrt(1 - $a));
     }
 
     /**

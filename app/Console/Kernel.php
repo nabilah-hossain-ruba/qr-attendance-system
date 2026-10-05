@@ -12,7 +12,8 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // $schedule->command('inspire')->hourly();
+        // Faculty are assigned to "TBA" sections over time, so re-sync regularly
+        $schedule->command('bracu:sync-schedule')->everySixHours()->withoutOverlapping();
     }
 
     /**

@@ -76,7 +76,7 @@ Route::middleware(['auth', 'role:student'])->group(function () {
     Route::get('/student/dashboard', [StudentController::class, 'dashboard'])->name('student.dashboard');
     Route::get('/student/attendance/history', [AttendanceController::class, 'history'])->name('student.attendance.history');
     Route::get('/student/scan-qr', [StudentController::class, 'scanQr'])->name('student.scan-qr');
-    Route::post('/attendance/mark', [AttendanceController::class, 'markAttendance'])->name('attendance.mark');
+    Route::post('/attendance/mark', [AttendanceController::class, 'markAttendance'])->middleware('throttle:10,1')->name('attendance.mark');
     
     // Course enrollment routes
     Route::get('/student/courses', [StudentController::class, 'showCourses'])->name('student.courses');
@@ -114,12 +114,12 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::get('/admin/users/{id}/edit', [AdminController::class, 'editUser'])->name('admin.users.edit');
     Route::put('/admin/users/{id}', [AdminController::class, 'updateUser'])->name('admin.users.update');
     Route::delete('/admin/users/{id}', [AdminController::class, 'deleteUser'])->name('admin.users.delete');
+    Route::post('/admin/users/{id}/reset-device', [AdminController::class, 'resetDevice'])->name('admin.users.reset-device');
     Route::post('/admin/users/reassign-courses', [AdminController::class, 'reassignCourses'])->name('admin.users.reassign-courses');
     
     // Course management routes
     Route::get('/admin/courses', [AdminController::class, 'courses'])->name('admin.courses');
     Route::post('/admin/courses/create', [AdminController::class, 'createCourse'])->name('admin.courses.create');
-    Route::post('/admin/upload-schedule', [AdminController::class, 'uploadSchedule'])->name('admin.upload-schedule');
     
     // Session management routes
     Route::get('/admin/sessions', [AdminController::class, 'sessions'])->name('admin.sessions');
@@ -131,8 +131,7 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::get('/admin/reports', [AdminController::class, 'reports'])->name('admin.reports');
     Route::post('/admin/reports/generate', [AdminController::class, 'generateReport'])->name('admin.reports.generate');
     
-    // CSV Import routes
+    // BRACU schedule sync
     Route::get('/admin/import-courses', [AdminController::class, 'showImportForm'])->name('admin.import-courses');
-    Route::post('/admin/preview-csv', [AdminController::class, 'previewCsvImport'])->name('admin.preview-csv');
-    Route::post('/admin/import-csv', [AdminController::class, 'importCoursesFromCsv'])->name('admin.import-csv');
+    Route::post('/admin/sync-bracu', [AdminController::class, 'syncBracuSchedule'])->name('admin.sync-bracu');
 });

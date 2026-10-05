@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class StudentController extends Controller
 {
@@ -36,9 +37,22 @@ class StudentController extends Controller
      *
      * @return \Illuminate\Contracts\Support\Renderable
      */
-    public function scanQr()
+    public function scanQr(Request $request)
     {
-        return view('student.scan-qr');
+        $response = response()->view('student.scan-qr');
+
+        // Give this browser a permanent device ID used to bind the student to one device
+        $cookieName = config('attendance.device_cookie');
+
+        if (!$request->cookie($cookieName)) {
+            $response->withCookie(cookie(
+                $cookieName,
+                (string) Str::uuid(),
+                config('attendance.device_cookie_minutes')
+            ));
+        }
+
+        return $response;
     }
     
     /**

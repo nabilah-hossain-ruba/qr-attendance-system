@@ -19,6 +19,10 @@
 
                     <div class="text-center mb-4">
                         <p class="lead">Scan the QR code provided by your lecturer to mark your attendance</p>
+                        <p class="text-muted small mb-0">
+                            You must be in the classroom with location access allowed.
+                            Your account is linked to the first device you mark attendance with &mdash; ask an admin if you change phones.
+                        </p>
                     </div>
 
                     <div class="row">
@@ -139,17 +143,44 @@
             }
         });
 
+        function getLocation() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject(new Error('Your browser does not support location, which is required to mark attendance.'));
+                    return;
+                }
+                navigator.geolocation.getCurrentPosition(
+                    position => resolve(position.coords),
+                    error => reject(new Error('Could not get your location: ' + error.message + '. Please allow location access and try again.')),
+                    { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+                );
+            });
+        }
+
         function processQrCode(qrCode) {
-            // Send to server using fetch API
-            fetch('{{ route("attendance.mark") }}', {
+            qrResultElement.innerHTML = 'Getting your location...';
+
+            getLocation()
+            .then(coords => fetch('{{ route("attendance.mark") }}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                 },
-                body: JSON.stringify({ qr_code: qrCode })
+                body: JSON.stringify({
+                    qr_code: qrCode,
+                    latitude: coords.latitude,
+                    longitude: coords.longitude,
+                    accuracy: coords.accuracy
+                })
+            }))
+            .then(response => {
+                if (response.status === 429) {
+                    return { success: false, message: 'Too many attempts. Please wait a minute and try again.' };
+                }
+                return response.json();
             })
-            .then(response => response.json())
             .then(data => {
                 qrResultElement.classList.remove('d-none');
                 

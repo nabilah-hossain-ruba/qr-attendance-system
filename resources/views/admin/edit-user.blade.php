@@ -81,6 +81,19 @@
                         </div>
 
                         <div class="row mb-3">
+                            <label for="faculty_initial" class="col-md-4 col-form-label text-md-end">{{ __('Faculty Initial') }}</label>
+                            <div class="col-md-6">
+                                <input id="faculty_initial" type="text" class="form-control text-uppercase @error('faculty_initial') is-invalid @enderror" name="faculty_initial" value="{{ old('faculty_initial', $user->faculty_initial) }}" maxlength="10">
+                                @error('faculty_initial')
+                                    <span class="invalid-feedback" role="alert">
+                                        <strong>{{ $message }}</strong>
+                                    </span>
+                                @enderror
+                                <small class="form-text text-muted">Lecturers only &mdash; BRACU initial (e.g. RBR). Their courses from BRACU Connect are assigned automatically.</small>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
                             <label for="password" class="col-md-4 col-form-label text-md-end">{{ __('New Password') }}</label>
                             <div class="col-md-6">
                                 <input id="password" type="password" class="form-control @error('password') is-invalid @enderror" name="password" autocomplete="new-password">
@@ -108,6 +121,27 @@
                             </div>
                         </div>
                     </form>
+
+                    @if ($user->isStudent())
+                        <hr>
+                        <div class="row">
+                            <label class="col-md-4 col-form-label text-md-end">{{ __('Attendance Device') }}</label>
+                            <div class="col-md-6">
+                                @if ($user->device_id)
+                                    <p class="form-control-plaintext mb-2">
+                                        Linked since {{ $user->device_bound_at ? $user->device_bound_at->format('M d, Y H:i') : 'unknown' }}
+                                    </p>
+                                    <form method="POST" action="{{ route('admin.users.reset-device', $user->id) }}"
+                                          onsubmit="return confirm('Unlink this device? The student will be able to mark attendance from a new device.');">
+                                        @csrf
+                                        <button type="submit" class="btn btn-outline-danger btn-sm">{{ __('Reset Device') }}</button>
+                                    </form>
+                                @else
+                                    <p class="form-control-plaintext text-muted">No device linked yet</p>
+                                @endif
+                            </div>
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>

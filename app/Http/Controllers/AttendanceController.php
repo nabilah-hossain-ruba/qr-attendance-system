@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Session;
 use App\Models\Attendance;
+use App\Models\User;
 
 class AttendanceController extends Controller
 {
@@ -69,8 +71,14 @@ class AttendanceController extends Controller
     {
         $request->validate([
             'qr_code' => 'required|string',
+            'latitude' => 'required|numeric|between:-90,90',
+            'longitude' => 'required|numeric|between:-180,180',
+            'accuracy' => 'nullable|numeric|min:0',
+        ], [
+            'latitude.required' => 'Your location is required to mark attendance. Please allow location access.',
+            'longitude.required' => 'Your location is required to mark attendance. Please allow location access.',
         ]);
-        
+
         // Find the session by QR code
         $session = Session::where('qr_code', $request->qr_code)
                          ->where('status', 'active')
@@ -103,19 +111,50 @@ class AttendanceController extends Controller
             ], 403);
         }
         
-        // Check if attendance already marked
-        $existingAttendance = Attendance::where('session_id', $session->id)
-                                      ->where('user_id', $user->id)
-                                      ->first();
-        
-        if ($existingAttendance) {
+        // Check the student is using their registered device
+        $deviceId = $request->cookie(config('attendance.device_cookie'));
+
+        if (!$deviceId) {
             return response()->json([
                 'success' => false,
-                'message' => 'Attendance already marked for this session.'
-            ], 400);
+                'message' => 'Device not recognised. Please reload the scan page and try again.'
+            ], 403);
         }
-        
-        // Mark attendance
+
+        $deviceError = $this->checkDevice($user, $deviceId);
+
+        if ($deviceError) {
+            return response()->json([
+                'success' => false,
+                'message' => $deviceError
+            ], 403);
+        }
+
+        // Check the student is near the classroom
+        $distance = null;
+
+        if ($session->hasLocation()) {
+            $maxAccuracy = config('attendance.max_accuracy_meters');
+
+            if ($request->filled('accuracy') && $request->accuracy > $maxAccuracy) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Your location is not accurate enough (±' . round($request->accuracy) . 'm). Turn on GPS / precise location and try again.'
+                ], 403);
+            }
+
+            $distance = $session->distanceTo((float) $request->latitude, (float) $request->longitude);
+            $radius = $session->radius_meters ?? config('attendance.radius_meters');
+
+            if ($distance > $radius) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You are too far from the classroom (' . round($distance) . 'm away). You must be within ' . $radius . 'm to mark attendance.'
+                ], 403);
+            }
+        }
+
+        // Mark attendance (the unique index on session_id + user_id prevents duplicates)
         $attendance = new Attendance();
         $attendance->session_id = $session->id;
         $attendance->user_id = $user->id;
@@ -123,8 +162,20 @@ class AttendanceController extends Controller
         $attendance->marked_at = now();
         $attendance->ip_address = $request->ip();
         $attendance->device_info = $request->userAgent();
-        $attendance->save();
-        
+        $attendance->device_id = $deviceId;
+        $attendance->latitude = $request->latitude;
+        $attendance->longitude = $request->longitude;
+        $attendance->distance_meters = $distance !== null ? (int) round($distance) : null;
+
+        try {
+            $attendance->save();
+        } catch (UniqueConstraintViolationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Attendance already marked for this session.'
+            ], 400);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Attendance marked successfully!',
@@ -136,6 +187,42 @@ class AttendanceController extends Controller
         ]);
     }
     
+    /**
+     * Bind the student to this device on first use, or check it matches the bound device.
+     * Returns an error message, or null if the device is allowed.
+     *
+     * @param  \App\Models\User  $user
+     * @param  string  $deviceId
+     * @return string|null
+     */
+    private function checkDevice(User $user, $deviceId)
+    {
+        if ($user->device_id) {
+            return $user->device_id === $deviceId
+                ? null
+                : 'Your account is registered to another device. Use that device or ask an admin to reset it.';
+        }
+
+        if (User::where('device_id', $deviceId)->where('id', '!=', $user->id)->exists()) {
+            return 'This device is already registered to another student.';
+        }
+
+        try {
+            $bound = User::where('id', $user->id)
+                         ->whereNull('device_id')
+                         ->update(['device_id' => $deviceId, 'device_bound_at' => now()]);
+        } catch (UniqueConstraintViolationException $e) {
+            return 'This device is already registered to another student.';
+        }
+
+        // Another request bound a different device first
+        if (!$bound && $user->fresh()->device_id !== $deviceId) {
+            return 'Your account is registered to another device. Use that device or ask an admin to reset it.';
+        }
+
+        return null;
+    }
+
     /**
      * Get attendance history for the authenticated student.
      *

@@ -15,13 +15,19 @@ class Course extends Model
      * @var array<int, string>
      */
     protected $fillable = [
+        'bracu_section_id',
         'course_code',
         'course_name',
+        'course_type',
         'section',
         'semester',
         'year',
         'lecturer_id',
+        'faculty_initials',
         'schedule',
+        'class_schedules',
+        'class_start_date',
+        'class_end_date',
         'room',
     ];
 
@@ -30,7 +36,39 @@ class Course extends Model
      */
     protected $casts = [
         'year' => 'integer',
+        'class_schedules' => 'array',
+        'class_start_date' => 'date',
+        'class_end_date' => 'date',
+        'synced_at' => 'datetime',
     ];
+
+    /**
+     * Class slots ([day, startTime, endTime]) this section meets on the given date,
+     * according to the synced BRACU timetable.
+     *
+     * @param  \Carbon\Carbon  $date
+     * @return array
+     */
+    public function classesOn($date)
+    {
+        if (empty($this->class_schedules)) {
+            return [];
+        }
+
+        // Compare calendar dates only, so timezones can't shift the semester by a day
+        $dateString = $date->toDateString();
+
+        if (($this->class_start_date && $dateString < $this->class_start_date->toDateString())
+            || ($this->class_end_date && $dateString > $this->class_end_date->toDateString())) {
+            return [];
+        }
+
+        $day = strtoupper($date->format('l'));
+
+        return array_values(array_filter($this->class_schedules, function ($slot) use ($day) {
+            return strtoupper($slot['day'] ?? '') === $day && !empty($slot['startTime']) && !empty($slot['endTime']);
+        }));
+    }
 
     /**
      * Get the lecturer assigned to this course section.

@@ -37,6 +37,7 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'device_id',
     ];
 
     /**
@@ -47,6 +48,7 @@ class User extends Authenticatable
     protected $casts = [
         'password' => 'hashed',
         'is_active' => 'boolean',
+        'device_bound_at' => 'datetime',
     ];
     
     /**
