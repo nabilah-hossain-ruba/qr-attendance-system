@@ -1,66 +1,122 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# 📲 QR Attendance System
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+![PHP](https://img.shields.io/badge/PHP-8.1%2B-777BB4?logo=php&logoColor=white)
+![Laravel](https://img.shields.io/badge/Laravel-10-FF2D20?logo=laravel&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-4479A1?logo=mysql&logoColor=white)
+![Bootstrap](https://img.shields.io/badge/Bootstrap-5-7952B3?logo=bootstrap&logoColor=white)
 
-## About Laravel
+A full-stack attendance platform for BRAC University. A lecturer opens a class session and shows a QR code; students scan it with their phone camera. Attendance only counts if the student is **enrolled**, the code is **still valid**, the student is **physically in the room**, and they're using **their own registered device**. These checks shut down the usual ways of cheating, like passing the code around or signing in for a friend.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## ✨ Features
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+**For lecturers**
+- One click starts a session and generates a QR code. The lecturer's GPS position becomes the classroom location.
+- Live session page shows who has checked in and when. Each record also stores the distance from the lecturer and the device used.
+- Close sessions early and **export attendance as CSV**.
+- Manage assigned courses and enrol students.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+**For students**
+- Scan the QR code in the browser with the phone camera (`html5-qrcode`). No app install needed.
+- Dashboard showing enrolled courses and **attendance history**.
+- Self-service course enrolment.
 
-## Learning Laravel
+**For admins**
+- Manage users, courses and sessions, and reassign courses between lecturers.
+- **Reset device bindings** when a student changes phones.
+- `php artisan bracu:sync-schedule` imports sections, class times and lecturers from the BRACU Connect schedule feed and matches lecturers by faculty initials.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## 🛡️ Anti-Proxy Checks
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+When a student scans, `POST /attendance/mark` runs these checks in order:
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+| # | Check | How it works |
+|---|---|---|
+| 1 | **Valid, unexpired code** | Each session gets a random token (`random_bytes`) that expires after `ATTENDANCE_QR_VALID_MINUTES` (default 10 minutes) or when the lecturer closes the session. |
+| 2 | **Enrolment** | Only students enrolled in that course section are accepted. |
+| 3 | **Device binding** | A long-lived encrypted cookie ties one student to one device and one device to one student. The first bind is an atomic conditional `UPDATE`, so two concurrent requests can't both claim the same device. |
+| 4 | **Geofence** | The student's GPS reading must be within `ATTENDANCE_RADIUS_METERS` (default 100 m) of the lecturer's position. Readings with poor accuracy (`> ATTENDANCE_MAX_ACCURACY_METERS`) are rejected, so a vague location can't slip through. |
+| 5 | **One mark per session** | A unique `(session_id, user_id)` index enforces this at the database level. |
+| 6 | **Rate limiting** | `throttle:10,1` limits each user to 10 marking attempts per minute. |
 
-## Laravel Sponsors
+Other safeguards: role-based route middleware (`role:admin|lecturer|student`), only `@bracu.ac.bd` emails can register, CSRF protection on every form, and lecturers can only see their own sessions.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## 🏗️ Architecture
 
-### Premium Partners
+```
+Lecturer browser ──(GPS + course)──► LecturerController@generateQrCode ──► sessions table
+       │                                                                     (token, expiry, lat/lng, radius)
+       └── shows QR (qrcode.js) ◄────────────────────────────────────────────────┘
+                                                                                 ▲
+Student phone ──(scan + GPS + device cookie)──► AttendanceController@markAttendance
+                                                  ├─ token valid & unexpired?
+                                                  ├─ enrolled?
+                                                  ├─ device bound to this student?
+                                                  ├─ within radius & accurate enough?
+                                                  └─ insert attendance (unique per session)
+```
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+**Data model:** `users` (role, student ID, bound device) · `courses` (BRACU section, schedule, lecturer) · `course_student` · `sessions` · `attendances` (distance, device, timestamp)
 
-## Contributing
+## 🚀 Getting Started
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+**Requirements:** PHP 8.1+, Composer, Node 18+, MySQL 8
 
-## Code of Conduct
+```bash
+git clone https://github.com/nabilah-hossain-ruba/qr-attendance-system.git
+cd qr-attendance-system
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+composer install
+npm install && npm run build
 
-## Security Vulnerabilities
+cp .env.example .env          # set DB_* (and MAIL_* for password reset emails)
+php artisan key:generate
+php artisan migrate --seed    # creates demo accounts and courses
+php artisan serve
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Then open `http://localhost:8000`.
 
-## License
+| Role | Email | Password |
+|---|---|---|
+| Admin | `admin@g.bracu.ac.bd` | `password` |
+| Lecturer | `lecturer.demo@g.bracu.ac.bd` | `password` |
+| Student | `student.demo@g.bracu.ac.bd` | `password` |
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+> Browsers only allow camera and location access over **HTTPS** (or `localhost`). To test from a phone, expose the dev server through an HTTPS tunnel such as `ngrok` or `cloudflared`.
+
+To import the real BRACU schedule:
+
+```bash
+php artisan bracu:sync-schedule
+```
+
+See [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) and [`docs/EMAIL_SETUP.md`](docs/EMAIL_SETUP.md) for more detail.
+
+## ⚙️ Configuration
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ATTENDANCE_QR_VALID_MINUTES` | `10` | How long a QR code can be scanned |
+| `ATTENDANCE_RADIUS_METERS` | `100` | Maximum distance from the lecturer |
+| `ATTENDANCE_MAX_ACCURACY_METERS` | `150` | Reject GPS readings less accurate than this |
+| `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` | demo values | Admin account created by the seeder |
+
+## 🗂️ Project Structure
+
+```
+app/
+├── Console/Commands/SyncBracuSchedule.php   # bracu:sync-schedule
+├── Http/Controllers/                        # Admin, Lecturer, Student, Attendance, Auth
+├── Http/Middleware/CheckRole.php            # role-based access
+├── Models/                                  # User, Course, Session, Attendance, Enrollment
+├── Rules/BracuEmail.php                     # @bracu.ac.bd registration rule
+└── Services/BracuScheduleSync.php           # schedule feed → courses + lecturers
+config/attendance.php                        # QR validity, geofence, device-cookie settings
+database/migrations/                         # schema incl. unique and device-binding constraints
+resources/views/{admin,lecturer,student}/    # Blade UIs
+legacy/                                      # pre-Laravel prototype (unused)
+```
+
+## 🧰 Tech Stack
+
+Laravel 10 · PHP 8.1 · MySQL · Blade + Bootstrap 5 · Vite · html5-qrcode · qrcode.js · Laravel Sanctum · Guzzle (schedule sync)

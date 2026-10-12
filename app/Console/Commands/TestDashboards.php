@@ -109,9 +109,9 @@ class TestDashboards extends Command
         $this->info('1. Run: php artisan serve');
         $this->info('2. Visit http://localhost:8000');
         $this->info('3. Login with:');
-        $this->info('   - Admin: nabilah.hossain@g.bracu.ac.bd / 123456780-0');
-        $this->info('   - Lecturer: sharaf.binte.younus@g.bracu.ac.bd / lecturer#1');
-        $this->info('   - Student: kazi.tahiyat.jahan@g.bracu.ac.bd / student#1');
+        $this->info('   - Admin: admin@g.bracu.ac.bd / password');
+        $this->info('   - Lecturer: lecturer.demo@g.bracu.ac.bd / password');
+        $this->info('   - Student: student.demo@g.bracu.ac.bd / password');
         
         return 0;
     }

@@ -19,35 +19,35 @@ class DemoDataSeeder extends Seeder
     {
         // Get or create Admin User
         $admin = User::firstOrCreate(
-            ['email' => 'nabilah.hossain@g.bracu.ac.bd'],
+            ['email' => env('SEED_ADMIN_EMAIL', 'admin@g.bracu.ac.bd')],
             [
-                'name' => 'Nabilah Hossain',
+                'name' => 'Demo Admin',
                 'email_verified_at' => now(),
-                'password' => Hash::make('123456780-0'),
+                'password' => Hash::make(env('SEED_ADMIN_PASSWORD', 'password')),
                 'role' => 'admin',
             ]
         );
 
         // Create Sample Lecturers
         $lecturer1 = User::firstOrCreate(
-            ['email' => 'sharaf.binte.younus@g.bracu.ac.bd'],
+            ['email' => 'lecturer.demo@g.bracu.ac.bd'],
             [
-                'name' => 'Sharaf Binte Younus',
+                'name' => 'Demo Lecturer',
                 'email_verified_at' => now(),
-                'password' => Hash::make('lecturer#1'),
+                'password' => Hash::make('password'),
                 'role' => 'lecturer',
             ]
         );
 
         // Create Sample Students
         $student1 = User::firstOrCreate(
-            ['email' => 'tahiyat.jahan.namira@g.bracu.ac.bd'],
+            ['email' => 'student.demo@g.bracu.ac.bd'],
             [
-                'name' => 'Tahiyat Jahan Namira',
+                'name' => 'Demo Student',
                 'email_verified_at' => now(),
-                'password' => Hash::make('student#1'),
+                'password' => Hash::make('password'),
                 'role' => 'student',
-                'student_id' => '222991000',
+                'student_id' => '20000001',
             ]
         );
 
@@ -86,8 +86,8 @@ class DemoDataSeeder extends Seeder
         );
 
         $this->command->info('Demo data created!');
-        $this->command->info('Admin: nabilah.hossain@bracu.ac.bd / 123456780-0');
-        $this->command->info('Lecturer: sharaf.binte.younus@g.bracu.ac.bd / lecturer#1');
-        $this->command->info('Student: tahiyat.jahan.namira@g.bracu.ac.bd / student#1');
+        $this->command->info('Admin: ' . env('SEED_ADMIN_EMAIL', 'admin@g.bracu.ac.bd') . ' / (SEED_ADMIN_PASSWORD, default "password")');
+        $this->command->info('Lecturer: lecturer.demo@g.bracu.ac.bd / password');
+        $this->command->info('Student: student.demo@g.bracu.ac.bd / password');
     }
 }

@@ -78,18 +78,18 @@ The BRACU QR Attendance System is a comprehensive web application built with Lar
 ## 👥 Demo User Accounts
 
 ### Admin Account
-- **Email:** nabilah.hossain@g.bracu.ac.bd
-- **Password:** 123456780-0
+- **Email:** admin@g.bracu.ac.bd
+- **Password:** password (set `SEED_ADMIN_PASSWORD` to change)
 - **Role:** Admin (Full system access)
 
 ### Lecturer Account
-- **Email:** sharaf.binte.younus@g.bracu.ac.bd
-- **Password:** lecturer#1
+- **Email:** lecturer.demo@g.bracu.ac.bd
+- **Password:** password
 - **Role:** Lecturer (Course management)
 
 ### Student Account
-- **Email:** kazi.tahiyat.jahan@g.bracu.ac.bd  
-- **Password:** student#1
+- **Email:** student.demo@g.bracu.ac.bd  
+- **Password:** password
 - **Role:** Student (Attendance marking)
 
 ## 📱 Using the System
@@ -141,7 +141,7 @@ php artisan dashboards:test
 
 1. **GD Extension**: The system requires PHP GD extension for QR code generation. If you encounter issues, ensure GD is enabled in your php.ini file.
 
-2. **Email Configuration**: The system is configured to use BRACU email (nabilah.hossain@g.bracu.ac.bd) for notifications and email verification. See the Email Setup section below for configuration details.
+2. **Email Configuration**: The system is configured to use BRACU email (your.email@g.bracu.ac.bd) for notifications and email verification. See the Email Setup section below for configuration details.
 
 3. **QR Code Testing**: Use the test QR code "TEST_QR_CODE_123" in the manual entry field for testing.
 
@@ -205,10 +205,10 @@ The system now includes email verification for new user registrations. To config
    MAIL_MAILER=smtp
    MAIL_HOST=smtp.gmail.com
    MAIL_PORT=587
-   MAIL_USERNAME=nabilah.hossain@g.bracu.ac.bd
+   MAIL_USERNAME=your.email@g.bracu.ac.bd
    MAIL_PASSWORD=your-app-password-here
    MAIL_ENCRYPTION=tls
-   MAIL_FROM_ADDRESS=nabilah.hossain@g.bracu.ac.bd
+   MAIL_FROM_ADDRESS=your.email@g.bracu.ac.bd
    MAIL_FROM_NAME="QR Attendance System"
    ```
 

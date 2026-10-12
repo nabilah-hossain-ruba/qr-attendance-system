@@ -8,10 +8,10 @@ Your `.env` file has been updated with the following email settings:
 MAIL_MAILER=smtp
 MAIL_HOST=smtp.gmail.com
 MAIL_PORT=587
-MAIL_USERNAME=nabilah.hossain@g.bracu.ac.bd
+MAIL_USERNAME=your.email@g.bracu.ac.bd
 MAIL_PASSWORD=your-app-password-here
 MAIL_ENCRYPTION=tls
-MAIL_FROM_ADDRESS=nabilah.hossain@g.bracu.ac.bd
+MAIL_FROM_ADDRESS=your.email@g.bracu.ac.bd
 MAIL_FROM_NAME="QR Attendance System"
 ```
 
@@ -19,7 +19,7 @@ MAIL_FROM_NAME="QR Attendance System"
 
 ### Step 1: Set up Gmail App Password
 
-1. **Enable 2-Factor Authentication** on the Gmail account `nabilah.hossain@g.bracu.ac.bd`
+1. **Enable 2-Factor Authentication** on the Gmail account `your.email@g.bracu.ac.bd`
    - Go to [Google Account Security](https://myaccount.google.com/security)
    - Enable 2-Step Verification if not already enabled
 
@@ -108,7 +108,7 @@ MAIL_PORT=2525
 MAIL_USERNAME=your-mailtrap-username
 MAIL_PASSWORD=your-mailtrap-password
 MAIL_ENCRYPTION=tls
-MAIL_FROM_ADDRESS=nabilah.hossain@g.bracu.ac.bd
+MAIL_FROM_ADDRESS=your.email@g.bracu.ac.bd
 MAIL_FROM_NAME="QR Attendance System"
 ```
 
@@ -120,7 +120,7 @@ MAIL_PORT=587
 MAIL_USERNAME=apikey
 MAIL_PASSWORD=your-sendgrid-api-key
 MAIL_ENCRYPTION=tls
-MAIL_FROM_ADDRESS=nabilah.hossain@g.bracu.ac.bd
+MAIL_FROM_ADDRESS=your.email@g.bracu.ac.bd
 MAIL_FROM_NAME="QR Attendance System"
 ```
 
@@ -143,4 +143,4 @@ If you encounter any issues with the email setup, please check:
 
 ---
 
-**Note**: The email verification system is now fully configured and ready to use. New users will receive verification emails from `nabilah.hossain@g.bracu.ac.bd` once the Gmail App Password is properly set up.
+**Note**: The email verification system is now fully configured and ready to use. New users will receive verification emails from `your.email@g.bracu.ac.bd` once the Gmail App Password is properly set up.
